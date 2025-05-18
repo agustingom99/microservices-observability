@@ -1,0 +1,46 @@
+microservices-observability/
+├── product-service/               # Servicio de productos (Node.js)
+│   ├── server.js                  # Código principal
+│   ├── tracing.js                 # Configuración de OpenTelemetry
+│   ├── metrics.js                 # Configuración de métricas
+│   ├── package.json               # Dependencias
+│   └── Dockerfile                 # Configuración de contenedor
+├── inventory-service/             # Servicio de inventario (Node.js)
+│   ├── server.js                  
+│   ├── tracing.js                 
+│   ├── metrics.js                 
+│   ├── package.json              
+│   └── Dockerfile                
+├── traffic-generator/             # Generador de tráfico para pruebas
+│   ├── index.js                   
+│   ├── package.json
+│   └── Dockerfile
+├── kubernetes-manifests/          # Manifiestos de Kubernetes
+│   ├── namespace.yaml
+│   ├── product-service.yaml
+│   ├── inventory-service.yaml
+│   ├── otel-collector.yaml        # OpenTelemetry Collector
+│   ├── jaeger.yaml                # Jaeger para trazas
+│   ├── prometheus.yaml            # Prometheus para métricas
+│   ├── grafana.yaml               # Grafana para visualización
+│   ├── loki.yaml                  # Loki para logs
+│   └── ingress.yaml               # Ingress para acceso externo
+├── kustomize/                     # Configuración de Kustomize
+│   ├── base/
+│   │   └── kustomization.yaml
+│   ├── overlays/
+│   │   ├── dev/
+│   │   │   ├── kustomization.yaml
+│   │   │   └── replicas-patch.yaml
+│   │   └── prod/
+│   │       ├── kustomization.yaml
+│   │       ├── replicas-patch.yaml
+│   │       └── resources-patch.yaml
+└── monitoring/                    # Configuración de herramientas de monitoreo
+    ├── opentelemetry/
+    │   └── otel-collector-config.yaml
+    ├── prometheus/
+    │   └── prometheus.yaml
+    └── grafana/
+        └── datasources/
+            └── datasources.yaml

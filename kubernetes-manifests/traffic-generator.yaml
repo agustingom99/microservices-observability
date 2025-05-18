@@ -1,0 +1,89 @@
+# Archivo: kubernetes-manifests/traffic-generator.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-generator
+  namespace: microservices-observability
+  labels:
+    app: traffic-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-generator
+  template:
+    metadata:
+      labels:
+        app: traffic-generator
+    spec:
+      containers:
+      - name: traffic-generator
+        image: agustingom99/traffic-generator:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: URL
+          value: "http://product-service.microservices-observability:3001"
+        - name: INTERVAL
+          value: "1000"
+        - name: ERRORS
+          value: "true"
+        resources:
+          limits:
+            cpu: "0.2"
+            memory: "256Mi"
+          requests:
+            cpu: "0.1"
+            memory: "128Mi"
+        command: ["node", "index.js", "--url", "$(URL)", "--interval", "$(INTERVAL)", "--errors"]
+---
+# Método alternativo usando CronJob para ejecución periódica
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: traffic-generator-job
+  namespace: microservices-observability
+spec:
+  schedule: "*/5 * * * *"  # Cada 5 minutos
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: traffic-generator-job
+        spec:
+          containers:
+          - name: traffic-generator
+            image: traffic-generator:latest
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: URL
+              value: "http://product-service.microservices-observability:3001"
+            - name: DURATION
+              value: "240"  # Duración en segundos
+            - name: INTERVAL
+              value: "1000"
+            - name: ERRORS
+              value: "true"
+            resources:
+              limits:
+                cpu: "0.2"
+                memory: "256Mi"
+              requests:
+                cpu: "0.1"
+                memory: "128Mi"
+            # Comando modificado para ejecutarse por un tiempo limitado
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              set -e
+              end=$(($(date +%s) + ${DURATION}))
+              echo "Iniciando generador de tráfico por ${DURATION} segundos..."
+              node index.js --url "${URL}" --interval "${INTERVAL}" --errors &
+              pid=$!
+              while [ $(date +%s) -lt $end ]; do
+                sleep 1
+              done
+              kill $pid
+              echo "Generador de tráfico finalizado."
+          restartPolicy: OnFailure

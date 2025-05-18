@@ -1,0 +1,127 @@
+# Archivo: docker-compose.yml
+version: '3.8'
+
+services:
+  # Servicio de Productos
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    ports:
+      - "3001:3001"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=product-service
+    depends_on:
+      - otel-collector
+    networks:
+      - microservices-net
+
+  # Servicio de Inventario
+  inventory-service:
+    build: ./inventory-service
+    container_name: inventory-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PRODUCT_SERVICE_URL=http://product-service:3001
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=inventory-service
+    depends_on:
+      - otel-collector
+      - product-service
+    networks:
+      - microservices-net
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.78.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./monitoring/opentelemetry/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus exporter
+      - "13133:13133" # Health check
+    depends_on:
+      - jaeger
+      - prometheus
+      - loki
+    networks:
+      - microservices-net
+
+  # Jaeger para visualización de trazas
+  jaeger:
+    image: jaegertracing/all-in-one:1.43
+    container_name: jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "14250:14250"  # Modelo gRPC
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - microservices-net
+
+  # Prometheus para métricas
+  prometheus:
+    image: prom/prometheus:v2.43.0
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - microservices-net
+
+  # Grafana para visualización
+  grafana:
+    image: grafana/grafana:9.5.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/datasources/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - microservices-net
+
+  # Loki para logs
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - microservices-net
+
+  # Generador de tráfico
+  traffic-generator:
+    build: ./traffic-generator
+    container_name: traffic-generator
+    environment:
+      - URL=http://product-service:3001
+      - INTERVAL=1000
+      - ERRORS=true
+    depends_on:
+      - product-service
+      - inventory-service
+    networks:
+      - microservices-net
+    command: ["node", "index.js", "--url", "http://product-service:3001", "--interval", "1000", "--errors"]
+
+networks:
+  microservices-net:
+    driver: bridge

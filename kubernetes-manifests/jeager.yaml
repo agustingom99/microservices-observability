@@ -1,0 +1,71 @@
+# Archivo: kubernetes-manifests/jaeger.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: microservices-observability
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.43
+        ports:
+        - containerPort: 16686
+          name: ui
+        - containerPort: 14250
+          name: grpc-model
+        - containerPort: 4317
+          name: otlp-grpc
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: microservices-observability
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 16686
+    targetPort: 16686
+    name: ui
+  - port: 14250
+    targetPort: 14250
+    name: grpc-model
+  - port: 4317
+    targetPort: 4317
+    name: otlp-grpc
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-ui
+  namespace: microservices-observability
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 16686
+    targetPort: 16686
+    name: ui
+  type: NodePort
